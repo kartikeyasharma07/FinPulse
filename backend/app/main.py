@@ -44,27 +44,6 @@ def root():
     return {"status": "ok", "service": "FinPulse API"}
 
 
-@app.get("/debug/nsepython-test")
-def debug_nsepython_test():
-    """
-    TEMPORARY - not part of the real app. Tests whether nsepython can reach
-    NSE's API from Render's servers. Delete once diagnosed.
-    """
-    from nsepython import nse_eq
-    try:
-        data = nse_eq("RELIANCE")
-        if not data:
-            return {"success": False, "reason": "empty response - no data returned"}
-        price_info = data.get("priceInfo") or {}
-        return {
-            "success": True,
-            "top_level_keys": list(data.keys()),
-            "last_price": price_info.get("lastPrice"),
-        }
-    except Exception as e:
-        return {"success": False, "error_type": type(e).__name__, "error_message": str(e)}
-
-
 @app.get("/companies")
 def list_companies():
     """All tracked companies with their latest price snapshot."""
