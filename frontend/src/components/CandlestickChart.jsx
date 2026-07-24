@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { createChart, ColorType } from 'lightweight-charts'
+import { createChart, CandlestickSeries, HistogramSeries, ColorType } from 'lightweight-charts'
 import { useTheme } from '../context/ThemeContext'
 
 // history: array of { date, open, high, low, close, volume }, oldest -> newest
@@ -25,7 +25,7 @@ export default function CandlestickChart({ history }) {
       timeScale: { borderVisible: false },
     })
 
-    const candleSeries = chart.addCandlestickSeries({
+    const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#16A34A',
       downColor: '#DC2626',
       borderVisible: false,
@@ -36,7 +36,7 @@ export default function CandlestickChart({ history }) {
       history.map((h) => ({ time: h.date, open: h.open, high: h.high, low: h.low, close: h.close }))
     )
 
-    const volumeSeries = chart.addHistogramSeries({
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     })
