@@ -44,23 +44,22 @@ def root():
     return {"status": "ok", "service": "FinPulse API"}
 
 
-@app.get("/debug/yfinance-test")
-def debug_yfinance_test():
+@app.get("/debug/nsepython-test")
+def debug_nsepython_test():
     """
-    TEMPORARY - not part of the real app. Tests whether yfinance can reach
-    Yahoo Finance from Render's servers (as opposed to a local machine).
-    Delete this endpoint once the network issue is diagnosed.
+    TEMPORARY - not part of the real app. Tests whether nsepython can reach
+    NSE's API from Render's servers. Delete once diagnosed.
     """
-    import yfinance as yf
+    from nsepython import nse_eq
     try:
-        hist = yf.Ticker("RELIANCE.NS").history(period="5d")
-        if hist.empty:
+        data = nse_eq("RELIANCE")
+        if not data:
             return {"success": False, "reason": "empty response - no data returned"}
+        price_info = data.get("priceInfo") or {}
         return {
             "success": True,
-            "rows_returned": len(hist),
-            "latest_close": float(hist["Close"].iloc[-1]),
-            "latest_date": str(hist.index[-1].date()),
+            "top_level_keys": list(data.keys()),
+            "last_price": price_info.get("lastPrice"),
         }
     except Exception as e:
         return {"success": False, "error_type": type(e).__name__, "error_message": str(e)}
