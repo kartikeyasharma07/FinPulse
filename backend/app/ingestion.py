@@ -1,28 +1,28 @@
 """
-Pulls data from NSE (via nsepython) and writes it into Supabase.
+Pulls data from yfinance and writes it into Supabase.
 Run this manually (`python -m app.ingestion`) whenever you want fresh data -
-daily is plenty for this use case. The API never calls NSE directly; it only
-ever reads from Supabase, which keeps the dashboard fast.
+daily is plenty for this use case. The API never calls yfinance directly;
+it only ever reads from Supabase, which keeps the dashboard fast and
+insulated from yfinance rate limits.
 
-Both price history and fundamentals (P/E, market cap) come from NSE's own
-website via nsepython - no Yahoo Finance dependency at all, which avoids
-the rate-limiting issues that source has had recently.
-
-Every network call is wrapped with a hard timeout: if a single company's
-request hangs, we skip it and move on instead of blocking the entire run.
+Uses curl_cffi to impersonate a real Chrome browser's TLS fingerprint,
+which avoids most of Yahoo's bot-detection blocking. Price history for
+all 20 companies is fetched in a single batched request (not 20 separate
+ones) to minimize load. Every network call has a hard timeout so a single
+hung request can't block the whole run.
 """
 import time
 import concurrent.futures as cf
-from datetime import date, timedelta
-
-import pandas as pd
-from nsepython import equity_history, nse_eq
+import yfinance as yf
+from curl_cffi import requests as curl_requests
+from datetime import date
 
 from app.db import supabase
 from app.companies_seed import COMPANIES
 
+session = curl_requests.Session(impersonate="chrome")
 TICKERS = [c["ticker"] for c in COMPANIES]
-TIMEOUT_SECS = 25
+TIMEOUT_SECS = 30
 
 
 def call_with_timeout(fn, timeout=TIMEOUT_SECS):
@@ -32,7 +32,7 @@ def call_with_timeout(fn, timeout=TIMEOUT_SECS):
         return future.result(timeout=timeout)
 
 
-def with_retry(fn, retries=2, delay=8):
+def with_retry(fn, retries=3, delay=15):
     """Retry a flaky network call with a growing delay."""
     for attempt in range(1, retries + 1):
         try:
@@ -52,120 +52,83 @@ def seed_companies():
     print("Companies table up to date.")
 
 
-def _find_col(row, *candidates):
-    """Find the first column whose name contains one of the candidate substrings
-    (case-insensitive) - NSE's raw field names vary by endpoint version."""
-    for col in row.index:
-        col_norm = str(col).strip().upper()
-        for cand in candidates:
-            if cand in col_norm:
-                return row[col]
-    return None
-
-
-def ingest_price_history(ticker: str):
-    """Fetch ~1 year of OHLCV history for one ticker from NSE and upsert it."""
-    nse_symbol = ticker.replace(".NS", "")
-    to_date = date.today()
-    from_date = to_date - timedelta(days=365)
-
-    df = with_retry(lambda: equity_history(
-        nse_symbol, "EQ",
-        from_date.strftime("%d-%m-%Y"),
-        to_date.strftime("%d-%m-%Y"),
+def ingest_all_price_history(period: str = "1y"):
+    """Fetch OHLCV history for ALL tickers in a single batched request."""
+    print(f"Downloading {period} of price history for all {len(TICKERS)} tickers in one batch...")
+    data = with_retry(lambda: yf.download(
+        tickers=TICKERS,
+        period=period,
+        group_by="ticker",
+        session=session,
+        threads=False,
+        progress=False,
     ))
 
-    if df is None or df.empty:
-        print(f"  [warn] no price history returned for {ticker}")
-        return
-
-    rows = []
-    for _, row in df.iterrows():
+    for ticker in TICKERS:
         try:
-            date_val = _find_col(row, "TIMESTAMP", "DATE")
-            open_val = _find_col(row, "OPENING_PRICE", "OPEN")
-            high_val = _find_col(row, "TRADE_HIGH", "HIGH")
-            low_val = _find_col(row, "TRADE_LOW", "LOW")
-            close_val = _find_col(row, "CLOSING_PRICE", "LAST_TRADED_PRICE", "CLOSE")
-            volume_val = _find_col(row, "TOT_TRADED_QTY", "TRADED_QTY", "VOLUME")
+            df = data[ticker].dropna(how="all")
+        except (KeyError, TypeError):
+            print(f"  [warn] no price history returned for {ticker}")
+            continue
 
-            if any(v is None for v in [date_val, open_val, high_val, low_val, close_val, volume_val]):
+        if df.empty:
+            print(f"  [warn] no price history returned for {ticker}")
+            continue
+
+        rows = []
+        for idx, row in df.iterrows():
+            if row.isnull().any():
                 continue
-
-            parsed_date = pd.to_datetime(date_val).strftime("%Y-%m-%d")
-
             rows.append({
                 "ticker": ticker,
-                "date": parsed_date,
-                "open": round(float(open_val), 2),
-                "high": round(float(high_val), 2),
-                "low": round(float(low_val), 2),
-                "close": round(float(close_val), 2),
-                "volume": int(float(volume_val)),
+                "date": idx.strftime("%Y-%m-%d"),
+                "open": round(float(row["Open"]), 2),
+                "high": round(float(row["High"]), 2),
+                "low": round(float(row["Low"]), 2),
+                "close": round(float(row["Close"]), 2),
+                "volume": int(row["Volume"]),
             })
-        except (ValueError, TypeError):
-            continue  # skip any malformed row rather than failing the whole ticker
 
-    if not rows:
-        print(f"  [warn] no usable price rows for {ticker}")
-        return
+        if not rows:
+            print(f"  [warn] no usable rows for {ticker}")
+            continue
 
-    # Supabase upsert has a payload size limit - send in chunks.
-    for i in range(0, len(rows), 200):
-        supabase.table("price_history").upsert(rows[i:i + 200]).execute()
+        for i in range(0, len(rows), 200):
+            supabase.table("price_history").upsert(rows[i:i + 200]).execute()
 
-    print(f"  {ticker}: upserted {len(rows)} price rows")
+        print(f"  {ticker}: upserted {len(rows)} price rows")
 
 
 def ingest_fundamentals(ticker: str):
-    """Fetch current P/E and market cap from NSE. EPS is derived (price / P/E)
-    since NSE's quote endpoint doesn't expose it directly - this is exact math,
-    not an estimate."""
-    nse_symbol = ticker.replace(".NS", "")
-    data = with_retry(lambda: nse_eq(nse_symbol))
-
-    pe_ratio = (data.get("metadata") or {}).get("pdSymbolPe")
-    last_price = (data.get("priceInfo") or {}).get("lastPrice")
-    issued_size = (data.get("securityInfo") or {}).get("issuedSize")
-
-    market_cap = None
-    if last_price and issued_size:
-        market_cap = round(float(last_price) * float(issued_size), 2)
-
-    eps = None
-    if last_price and pe_ratio and float(pe_ratio) != 0:
-        eps = round(float(last_price) / float(pe_ratio), 2)
-
+    """Fetch current fundamentals for one ticker and store today's snapshot."""
+    info = with_retry(lambda: yf.Ticker(ticker, session=session).info)
     row = {
         "ticker": ticker,
         "as_of_date": date.today().isoformat(),
-        "market_cap": market_cap,
-        "pe_ratio": pe_ratio,
-        "eps": eps,
+        "market_cap": info.get("marketCap"),
+        "pe_ratio": info.get("trailingPE"),
+        "eps": info.get("trailingEps"),
     }
     supabase.table("fundamentals").upsert([row]).execute()
-    print(f"  {ticker}: fundamentals stored (P/E={pe_ratio})")
+    print(f"  {ticker}: fundamentals stored (P/E={info.get('trailingPE')})")
 
 
 def run():
     seed_companies()
 
-    print("\nFetching price history from NSE for each company...")
-    for ticker in TICKERS:
-        print(f"\n{ticker}")
-        try:
-            ingest_price_history(ticker)
-        except Exception as e:
-            print(f"  [error] {ticker} price history failed/timed out: {e}")
-        time.sleep(1)
+    print()
+    try:
+        ingest_all_price_history()
+    except Exception as e:
+        print(f"[error] batched price history failed entirely: {e}")
 
-    print("\nFetching fundamentals from NSE for each company...")
+    print("\nFetching fundamentals for each company...")
     for ticker in TICKERS:
         try:
             ingest_fundamentals(ticker)
         except Exception as e:
-            print(f"  [warn] {ticker} fundamentals failed/timed out: {e}")
-        time.sleep(1)
+            print(f"  [warn] {ticker} fundamentals failed: {e}")
+        time.sleep(3)
 
     print("\nIngestion complete.")
 

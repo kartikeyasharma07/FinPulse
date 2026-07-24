@@ -44,6 +44,28 @@ def root():
     return {"status": "ok", "service": "FinPulse API"}
 
 
+@app.get("/debug/yfinance-test")
+def debug_yfinance_test():
+    """
+    TEMPORARY - not part of the real app. Tests whether yfinance can reach
+    Yahoo Finance from Render's servers (as opposed to a local machine).
+    Delete this endpoint once the network issue is diagnosed.
+    """
+    import yfinance as yf
+    try:
+        hist = yf.Ticker("RELIANCE.NS").history(period="5d")
+        if hist.empty:
+            return {"success": False, "reason": "empty response - no data returned"}
+        return {
+            "success": True,
+            "rows_returned": len(hist),
+            "latest_close": float(hist["Close"].iloc[-1]),
+            "latest_date": str(hist.index[-1].date()),
+        }
+    except Exception as e:
+        return {"success": False, "error_type": type(e).__name__, "error_message": str(e)}
+
+
 @app.get("/companies")
 def list_companies():
     """All tracked companies with their latest price snapshot."""
