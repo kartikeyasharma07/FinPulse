@@ -1,102 +1,22 @@
 {
-  "RELIANCE.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "TCS.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "HDFCBANK.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "ICICIBANK.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "INFY.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "HINDUNILVR.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "ITC.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "SBIN.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "BHARTIARTL.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "LT.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "KOTAKBANK.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "BAJFINANCE.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "HCLTECH.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "ASIANPAINT.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "MARUTI.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "AXISBANK.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "SUNPHARMA.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "TITAN.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "TATAMOTORS.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  },
-  "ADANIENT.NS": {
-    "market_cap": null,
-    "pe_ratio": null,
-    "eps": null
-  }
+  "RELIANCE.NS": { "market_cap": "17.22T", "pe_ratio": 23.04, "eps": 55.47 },
+  "TCS.NS": { "market_cap": "8.16T", "pe_ratio": 16.30, "eps": 138.41 },
+  "HDFCBANK.NS": { "market_cap": "11.51T", "pe_ratio": 16.67, "eps": 44.57 },
+  "ICICIBANK.NS": { "market_cap": "10.29T", "pe_ratio": 18.55, "eps": 77.32 },
+  "INFY.NS": { "market_cap": "4.24T", "pe_ratio": 13.42, "eps": 77.55 },
+  "HINDUNILVR.NS": { "market_cap": "5.08T", "pe_ratio": 47.77, "eps": 45.18 },
+  "ITC.NS": { "market_cap": "3.52T", "pe_ratio": 17.04, "eps": 16.64 },
+  "SBIN.NS": { "market_cap": "9.35T", "pe_ratio": 11.11, "eps": 91.35 },
+  "BHARTIARTL.NS": { "market_cap": "12.05T", "pe_ratio": 43.52, "eps": 44.41 },
+  "LT.NS": { "market_cap": "5.22T", "pe_ratio": 32.45, "eps": 116.60 },
+  "KOTAKBANK.NS": { "market_cap": "3.81T", "pe_ratio": 18.79, "eps": 20.47 },
+  "BAJFINANCE.NS": { "market_cap": "6.30T", "pe_ratio": 34.08, "eps": 30.47 },
+  "HCLTECH.NS": { "market_cap": "3.37T", "pe_ratio": 19.37, "eps": 64.23 },
+  "ASIANPAINT.NS": { "market_cap": "2.56T", "pe_ratio": 59.16, "eps": 45.10 },
+  "MARUTI.NS": { "market_cap": "4.21T", "pe_ratio": 28.71, "eps": 467.78 },
+  "AXISBANK.NS": { "market_cap": "3.80T", "pe_ratio": 13.76, "eps": 88.79 },
+  "SUNPHARMA.NS": { "market_cap": "4.66T", "pe_ratio": 40.88, "eps": 47.87 },
+  "TITAN.NS": { "market_cap": "4.15T", "pe_ratio": 82.18, "eps": 57.31 },
+  "TATAMOTORS.NS": { "market_cap": "1.50T", "pe_ratio": 49.56, "eps": 8.24 },
+  "ADANIENT.NS": { "market_cap": "4.10T", "pe_ratio": 40.90, "eps": 73.84 }
 }

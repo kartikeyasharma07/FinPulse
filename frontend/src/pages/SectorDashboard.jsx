@@ -58,10 +58,13 @@ export default function SectorDashboard() {
             </div>
             <ul className="space-y-1.5">
               {s.companies.map((c) => (
-                <li key={c.ticker}>
-                  <Link to={`/companies/${c.ticker}`} className="text-sm hover:text-accent">
+                <li key={c.ticker} className="flex items-baseline justify-between gap-3">
+                  <Link to={`/companies/${c.ticker}`} className="text-sm hover:text-accent truncate">
                     {c.name}
                   </Link>
+                  <span className="text-xs text-slate-400 dark:text-slate-500 tabular shrink-0">
+                    {formatCrores(c.fundamentals?.market_cap)}
+                  </span>
                 </li>
               ))}
             </ul>

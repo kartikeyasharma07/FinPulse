@@ -39,6 +39,24 @@ def _latest_price(ticker: str):
     return res.data[0] if res.data else None
 
 
+def _all_latest_prices():
+    """One query for every company's latest price, via the latest_prices() DB function."""
+    res = supabase.rpc("latest_prices").execute()
+    return {row["ticker"]: row for row in res.data}
+
+
+def _all_latest_fundamentals():
+    """One query for every company's fundamentals. Table is small, so fetching
+    everything and picking the most recent per ticker in Python is cheap and
+    avoids N separate queries."""
+    res = supabase.table("fundamentals").select("*").order("as_of_date", desc=True).execute()
+    latest = {}
+    for row in res.data:
+        if row["ticker"] not in latest:
+            latest[row["ticker"]] = row
+    return latest
+
+
 @app.get("/")
 def root():
     return {"status": "ok", "service": "FinPulse API"}
@@ -46,11 +64,15 @@ def root():
 
 @app.get("/companies")
 def list_companies():
-    """All tracked companies with their latest price snapshot."""
+    """All tracked companies with their latest price snapshot. Uses 3 total
+    database queries (companies, prices, fundamentals) instead of one query
+    per company - much faster with 20+ tracked companies."""
     companies = supabase.table("companies").select("*").execute().data
+    prices = _all_latest_prices()
+    fundamentals = _all_latest_fundamentals()
     for c in companies:
-        c["latest_price"] = _latest_price(c["ticker"])
-        c["fundamentals"] = _latest_fundamentals(c["ticker"])
+        c["latest_price"] = prices.get(c["ticker"])
+        c["fundamentals"] = fundamentals.get(c["ticker"])
     return companies
 
 
