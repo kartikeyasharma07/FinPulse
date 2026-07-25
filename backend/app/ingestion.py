@@ -1,6 +1,7 @@
 """
-Pulls price history from NSE (via nselib) and fundamentals from yfinance,
-writing both into Supabase. Run manually whenever you want fresh data:
+Pulls price history from NSE (via nselib) and writes it into Supabase,
+along with fundamentals from a manually filled local file. Run manually
+whenever you want fresh price data:
 
     python -m app.ingestion
 
@@ -8,22 +9,39 @@ The API never calls these sources directly - it only ever reads from
 Supabase, which keeps the dashboard fast either way.
 
 Price history: nselib talks to NSE directly and is confirmed working.
-Fundamentals (P/E, EPS, market cap): best-effort via yfinance, since NSE
-doesn't expose these as simply. If a company's fundamentals fail, it's
-skipped and the dashboard just shows "N/A" for that field - not a blocker.
+Fundamentals (P/E, EPS, market cap): loaded from data/fundamentals.json,
+since NSE doesn't expose these simply and Yahoo Finance blocks automated
+requests. Fill that file in once (see README) - it doesn't change often,
+so it doesn't need to be re-scraped on every run.
 """
+import json
+import re
 import time
 from datetime import date
+from pathlib import Path
 
 from nselib import capital_market
-import yfinance as yf
-from curl_cffi import requests as curl_requests
 
 from app.db import supabase
 from app.companies_seed import COMPANIES
 
-session = curl_requests.Session(impersonate="chrome")
 TICKERS = [c["ticker"] for c in COMPANIES]
+FUNDAMENTALS_FILE = Path(__file__).parent.parent / "data" / "fundamentals.json"
+SUFFIX_MULTIPLIERS = {"K": 1e3, "M": 1e6, "B": 1e9, "T": 1e12}
+
+
+def parse_number(value):
+    """Accepts a plain number, or a string like '18.97T' / '500.5B'."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    value = str(value).strip().upper().replace(",", "").replace("₹", "")
+    match = re.match(r"^(-?\d+\.?\d*)([KMBT]?)$", value)
+    if not match:
+        return None
+    number, suffix = match.groups()
+    return float(number) * SUFFIX_MULTIPLIERS.get(suffix, 1)
 
 
 def seed_companies():
@@ -80,18 +98,35 @@ def ingest_price_history(ticker: str):
     print(f"  {ticker}: upserted {len(rows)} price rows")
 
 
-def ingest_fundamentals(ticker: str):
-    """Best-effort fundamentals via yfinance. Failures are non-fatal."""
-    info = yf.Ticker(ticker, session=session).info
-    row = {
-        "ticker": ticker,
-        "as_of_date": date.today().isoformat(),
-        "market_cap": info.get("marketCap"),
-        "pe_ratio": info.get("trailingPE"),
-        "eps": info.get("trailingEps"),
-    }
-    supabase.table("fundamentals").upsert([row]).execute()
-    print(f"  {ticker}: fundamentals stored (P/E={info.get('trailingPE')})")
+def load_fundamentals():
+    """Load fundamentals from the manually filled local JSON file."""
+    if not FUNDAMENTALS_FILE.exists():
+        print(f"[skip] fundamentals file not found at {FUNDAMENTALS_FILE}")
+        return
+
+    with open(FUNDAMENTALS_FILE) as f:
+        data = json.load(f)
+
+    today = date.today().isoformat()
+
+    for ticker, values in data.items():
+        market_cap = parse_number(values.get("market_cap"))
+        pe_ratio = parse_number(values.get("pe_ratio"))
+        eps = parse_number(values.get("eps"))
+
+        if market_cap is None and pe_ratio is None and eps is None:
+            print(f"  [skip] {ticker}: no fundamentals filled in yet")
+            continue
+
+        row = {
+            "ticker": ticker,
+            "as_of_date": today,
+            "market_cap": market_cap,
+            "pe_ratio": pe_ratio,
+            "eps": eps,
+        }
+        supabase.table("fundamentals").upsert([row]).execute()
+        print(f"  {ticker}: fundamentals stored (P/E={pe_ratio}, EPS={eps})")
 
 
 def run():
@@ -106,13 +141,8 @@ def run():
             print(f"  [error] {ticker} price history failed: {e}")
         time.sleep(1)  # be reasonably polite to NSE
 
-    print("\nFetching fundamentals (best-effort via yfinance)...")
-    for ticker in TICKERS:
-        try:
-            ingest_fundamentals(ticker)
-        except Exception as e:
-            print(f"  [skip] {ticker} fundamentals unavailable: {e}")
-        time.sleep(2)
+    print("\nLoading fundamentals from data/fundamentals.json...")
+    load_fundamentals()
 
     print("\nIngestion complete.")
 
