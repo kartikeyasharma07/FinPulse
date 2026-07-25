@@ -16,9 +16,9 @@ Visit `http://localhost:5173`. Make sure the backend is running first (see `../b
 ## Pages
 
 - `/` — company list, search + sector filter
-- `/companies/:ticker` — fundamentals, candlestick + volume chart, PDF export
+- `/companies/:ticker` — fundamentals, candlestick + volume chart
 - `/compare` — pick 2-4 companies, normalized % change chart + metrics table
-- `/sectors` — sector-wise market cap breakdown
+- `/sectors` — sector-wise market cap breakdown, with per-company market cap
 
 ## Deploying (Vercel)
 

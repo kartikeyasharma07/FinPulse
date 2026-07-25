@@ -27,3 +27,12 @@ create table if not exists fundamentals (
     eps numeric,
     primary key (ticker, as_of_date)
 );
+
+-- Returns the single most recent price row per ticker, in one query
+-- instead of the API needing to query once per company.
+create or replace function latest_prices()
+returns setof price_history as $$
+    select distinct on (ticker) *
+    from price_history
+    order by ticker, date desc;
+$$ language sql stable;
