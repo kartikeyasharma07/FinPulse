@@ -44,6 +44,55 @@ def root():
     return {"status": "ok", "service": "FinPulse API"}
 
 
+@app.get("/debug/nse-raw-test")
+def debug_nse_raw_test():
+    """
+    TEMPORARY - not part of the real app. Tests the NSE quote-equity
+    endpoint with a manual browser-style cookie handshake, bypassing any
+    library's internal session handling. Delete once diagnosed.
+    """
+    import requests
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.nseindia.com/",
+    }
+
+    try:
+        session = requests.Session()
+        session.headers.update(headers)
+        session.get("https://www.nseindia.com", timeout=10)
+        resp = session.get(
+            "https://www.nseindia.com/api/quote-equity?symbol=RELIANCE",
+            timeout=10,
+        )
+        try:
+            data = resp.json()
+        except ValueError:
+            return {
+                "success": False,
+                "status_code": resp.status_code,
+                "reason": "response was not valid JSON",
+                "body_preview": resp.text[:300],
+            }
+
+        if not data:
+            return {"success": False, "status_code": resp.status_code, "reason": "empty JSON object returned"}
+
+        price_info = data.get("priceInfo") or {}
+        return {
+            "success": True,
+            "status_code": resp.status_code,
+            "top_level_keys": list(data.keys()),
+            "last_price": price_info.get("lastPrice"),
+        }
+    except Exception as e:
+        return {"success": False, "error_type": type(e).__name__, "error_message": str(e)}
+
+
 @app.get("/companies")
 def list_companies():
     """All tracked companies with their latest price snapshot."""
@@ -81,7 +130,7 @@ def get_history(ticker: str, days: int = Query(365, ge=1, le=1825)):
     if not res.data:
         raise HTTPException(status_code=404, detail=f"No price history for {ticker}")
 
-    return list(reversed(res.data))  # oldest -> newest, easier for charting
+    return list(reversed(res.data))
 
 
 @app.get("/compare")
