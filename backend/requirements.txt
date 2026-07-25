@@ -8,3 +8,4 @@ yfinance==0.2.43
 curl_cffi==0.7.4
 nsepython
 nselib
+jugaad-data
