@@ -44,44 +44,6 @@ def root():
     return {"status": "ok", "service": "FinPulse API"}
 
 
-@app.get("/debug/jugaad-test")
-def debug_jugaad_test():
-    """
-    TEMPORARY - not part of the real app. Tests jugaad-data's live quote
-    feature from Render's servers, with a hard timeout so a hang can't
-    block the request forever. Delete once diagnosed.
-    """
-    import concurrent.futures as cf
-    from jugaad_data.nse import NSELive
-
-    def fetch():
-        nse = NSELive()
-        return nse.stock_quote("RELIANCE")
-
-    try:
-        with cf.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(fetch)
-            data = future.result(timeout=20)
-
-        if not data:
-            return {"success": False, "reason": "empty response - no data returned"}
-
-        price_info = data.get("priceInfo", {})
-        metadata = data.get("metadata", {})
-        security_info = data.get("securityInfo", {})
-        return {
-            "success": True,
-            "top_level_keys": list(data.keys()),
-            "last_price": price_info.get("lastPrice"),
-            "pe_ratio": metadata.get("pdSymbolPe"),
-            "issued_size": security_info.get("issuedSize"),
-        }
-    except cf.TimeoutError:
-        return {"success": False, "reason": "timed out after 20s - request hung"}
-    except Exception as e:
-        return {"success": False, "error_type": type(e).__name__, "error_message": str(e)}
-
-
 @app.get("/companies")
 def list_companies():
     """All tracked companies with their latest price snapshot."""
